@@ -1,0 +1,375 @@
+from colorama import Fore, Style
+from pathlib import Path
+import os
+import string
+import random
+import threading
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import time
+import signal
+import atexit
+import json
+import uuid
+import socket
+import subprocess
+import sys
+import traceback
+import shutil
+
+class PIDFileHandler(FileSystemEventHandler):
+    def __init__(self, manager):
+        # Register manager
+        self.manager = manager
+        print("Watch activated")
+
+    def on_deleted(self, event):
+        filename = os.path.basename(event.src_path)
+        print("Watch detected file remove")
+        if not event.is_directory:
+            with self.manager._lock:
+                if str(filename).replace('.txt','') in self.manager._session:
+                    del self.manager._session[self.manager._session.index(str(filename).replace('.txt',''))]
+                    #print(str(filename).replace('.txt', ''))
+                    #print(self.manager.PID)
+                    #print(str(filename).replace('.txt', '') == str(self.manager.PID))
+                    if str(filename).replace('.txt','') == str(self.manager.PID):
+                        exit(2)
+
+    def on_created(self, event):
+        filename = os.path.basename(event.src_path)
+        print("Watch detected file addition")
+        if not event.is_directory:
+            with self.manager._lock:
+                if not filename in self.manager._session:
+                    self.manager._session.append(filename)
+
+
+class CommandHandler:
+    """
+    Command Handler by RYU
+
+    /bins/sys - for essentials system programs
+    /bins/usr - for users system programs
+
+    Example of program tree
+    - System/User Prog.
+    /bins/(usr or sys)/(name)/-- program.py
+                     |_ info.json
+                     |_ libs/ -- (another libs).py
+                     |_ conf/ -- (conf).conf
+
+    """ 
+
+    def __init__(self, root, PID):
+        # Define constants
+        self.__PATH = str(root)+"/bins"
+        self.__SYSP = self.__PATH+"/sys"
+        self.__USRP = self.__PATH+"/usr"
+        self.__PID = PID
+
+        # Call essential funs
+        print("[!] Loading essentials CMD..")
+        self.__Scan()
+        print("[V] Successfully loaded.")
+
+    def exc(self, tx, args):
+        if not tx in self.__SysBIN.keys():
+            return (False, 'Command not found')
+        else:
+            try:
+
+                cmd = self.__SysBIN[tx]
+                self.__run_bin_py(cmd['path_venv'], cmd['path']+'/bin.py', args)
+                return (True, "")
+            except KeyError:
+                return (False, 'Command Not Found or Invalid Configuration.')
+
+
+
+
+
+    def __Setupvenv(self, target_dir):
+        target = Path(target_dir).resolve()
+        venv_dir = target / ".venv"
+    
+        # Step 1: Buat venv
+        print(f"[+] Membuat virtual environment di {venv_dir}")
+        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+
+        # Step 2: Install dependensi
+        pip_path = venv_dir / "bin" / "pip"
+        req_path = target / "requirements.txt"
+        if req_path.exists():
+            print(f"[+] Menginstal requirements dari {req_path}")
+            subprocess.run([str(pip_path), "install", "-r", str(req_path)], check=True)
+        else:
+            print("[!] requirements.txt tidak ditemukan, lanjut tanpa install.")
+
+        return venv_dir
+
+    def __run_bin_py(self, venv_dir, bin_path, args):
+        a = args.copy()
+        a.append(str(self.__PID))
+        python_path = venv_dir+"/bin/python"
+        print(f"[+] Menjalankan {bin_path} dengan python dari venv...")
+        subprocess.run([str(python_path), str(bin_path)] + a, check=True)
+
+    def __Scan(self):
+        x_sys = os.listdir(self.__SYSP)
+        x_usr = os.listdir(self.__USRP)
+        _x = self.__TreeCheck(x_sys, v=True)
+
+        self.__SysBIN = {}
+        for key, val in _x.items():
+            path = val["path"]
+            if not os.path.exists(path + "/.venv"):
+                self.__Setupvenv(Path(path))
+            val = val.copy()  # supaya gak ubah yang lama
+            val["path_venv"] = os.path.join(path, ".venv")
+            self.__SysBIN[key] = val
+
+    
+
+
+
+
+
+    def __TreeCheck(self, dirv, s=False, v=False):
+        def convert(sd, sign, rep):
+            return sd.replace('[[['+sign+']]]', rep)
+
+        if not s:
+            svalid = {}
+            signature = Util.random_str_gen(64)
+            sys_bd = self.__SYSP + "/[[["+signature+"]]]"
+            sysbp = sys_bd+'/bin.py'
+            sysnfo = sys_bd+'/info.json'
+
+            for x in dirv:
+                if v:
+                    print("\n\nRegistering app with path: ", self.__SYSP+"/"+x)
+                if os.path.exists(self.__SYSP+"/"+x):
+                    if os.path.exists(convert(sysbp, signature, x)) and os.path.exists(convert(sysnfo, signature, x)):
+                        if v: print("!- Registering binary with following path: "+convert(sysbp, signature, x))
+                        try:
+                            with open(convert(sysnfo, signature, x)) as nfo:
+                                yd = json.load(nfo)
+                                if v: print("!-- ", yd, "\n\n")
+                                if Util.is_valid_uuid(yd["uuid"]):
+                                    yd["path"] = self.__SYSP+"/"+x
+                                    svalid[yd["call"]] = yd
+                                else:
+                                    print("Invalid UUID")
+                                    continue
+                        except FileNotFoundError:
+                            print("Config File Doesn't exists")
+                            continue
+                        except json.JSONDecodeError:
+                            print("Invalid Config File")
+                            continue
+            return svalid
+
+
+
+
+
+class Util:
+    @staticmethod
+    def random_str_gen(length=12):
+        chars = string.ascii_letters + string.digits  # abcABC123
+        return ''.join(random.choice(chars) for _ in range(length))
+
+    @staticmethod
+    def MakeSession (root):
+        pid = os.getpid()
+        with open(root+"/"+str(pid)+".txt", "w") as t:
+            t.write('')
+        
+
+    @staticmethod
+    def is_valid_uuid(uuid_to_test, version=4):
+        """
+        Check if uuid_to_test is a valid UUID.
+    
+        Parameters
+        ----------
+        uuid_to_test : str
+        version : {1, 2, 3, 4}
+    
+        Returns
+        -------
+        `True` if uuid_to_test is a valid UUID, otherwise `False`.
+    
+        Examples
+        --------
+        >>> is_valid_uuid('c9bf9e57-1685-4c89-bafb-ff5af830be8a')
+        True
+        >>> is_valid_uuid('c9bf9e58')
+        False
+        """
+    
+        try:
+            uuid_obj = uuid.UUID(uuid_to_test, version=version)
+        except ValueError:
+            return False
+        return str(uuid_obj) == uuid_to_test
+
+
+class PySH:
+    def __init__(self):
+        # define constants
+        self.__VERSION = "1.0p"
+        self.__NAME = "Python non-integrated Shell"
+        self.__ROOT = Path(__file__).parent
+        self.__SESSION_PATH = str(self.__ROOT)+"/sessions"
+        self.PID = os.getpid()
+        
+        self.__SOCKET = str(self.__ROOT)+"/sockets/"+str(self.PID)
+        self.__NUM_SOCK = 16
+        self.__SOCKET_STATUS = [False] * self.__NUM_SOCK
+        self.__SOCKET_LOCKS = [threading.Lock() for _ in range(self.__NUM_SOCK)]
+
+        
+        
+
+        # Rewrite signals
+        signal.signal(signal.SIGINT, self.__exit)
+        signal.signal(signal.SIGTERM, self.__exit)
+    
+    
+
+        try:# Run essentials fn's
+            Util.MakeSession(self.__SESSION_PATH)
+    
+
+            # define required/essentials vars
+            self.__observer = Observer()
+            self._session = self.__detectSession()
+            self._lock = threading.Lock()
+
+            self.__watchSession()
+
+            for i in range(self.__NUM_SOCK):
+                threading.Thread(target=self.__startServer, args=(i,), daemon=True).start()
+            
+        
+
+            self.__cmd = CommandHandler(self.__ROOT, self.PID)
+            self.startShell()
+            
+        except Exception as e:
+            print("There is an error, exiting.. \n\n")
+            print(traceback.format_exc())
+            os.remove(self.__SESSION_PATH+"/"+str(self.PID)+".txt")
+
+    def __PANIC(self):
+        print('[' + Fore.RED + " PANIC! " + Style.RESET_ALL + "] There is a fatal error.")
+
+
+    """
+    ShellAPI, the way that allow app to communicate with the server/daemon (the root/shell)
+    it uses Socket mechanic
+
+    """
+
+    def __handleClient(self, conn,index):
+        with self.__SOCKET_LOCKS[index]:
+            self.__SOCKET_STATUS[index] = True
+        try:
+            data = conn.recv(4096)
+            request = json.loads(data.decode())
+            print(f"[shell] Permintaan dari {request['app']} : {request['action']}")
+
+            response = {}
+
+            if request['action'] == "Ping":
+                target = request['target']
+                response = {"status": "OK", "message": "boo!!"}
+                with self.__SOCKET_LOCKS[index]
+                #if target.startswith("cache/"):
+                #    os.system(f"rm -rf {target}")
+                #    response = {"status": "OK", "message": f"Deleted {target}"}
+                #else:
+                #    response = {"status": "DENIED", "message": "Unauthorized path"}
+
+            conn.send(json.dumps(response).encode())
+        except Exception as e:
+            conn.send(json.dumps({"status": "ERROR", "message": str(e)}).encode())
+        finally:
+            conn.close()
+
+    def __startServer(self, idx):
+        os.makedirs(self.__SOCKET, exist_ok=True)
+        path = os.path.join(self.__SOCKET, f"sock{idx}.sock")
+        print(Fore.RED+path+Style.RESET_ALL)
+        if os.path.exists(path):
+            shutil.rmtree(path, ignore_errors=True)
+
+
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(path)
+        server.listen(5)
+        print(f"[+] Listening on {path}")
+
+        while True:
+            conn, _ = server.accept()
+            threading.Thread(target=self.__handleClient, args=(conn,idx,), daemon=True).start()
+
+
+    """
+    Session handling System
+
+    all sessions are stored in (root)/sessions
+    every sessions have its instance, so if a session file removed (by force), it'll destroy a shell instance related to the session file
+
+
+    """
+
+    def __detectSession (self):
+        # Check if the directory exists
+        if not os.path.exists(self.__SESSION_PATH):
+            self.__PANIC()
+
+        _d = os.listdir(self.__SESSION_PATH)
+        d = []
+        for i in _d:
+            d.append(i.replace('.txt', ''))
+        return d
+
+    def __watchSession(self):
+        handler = PIDFileHandler(self)
+        self.__observer.schedule(handler, self.__SESSION_PATH, recursive=False)
+        self.__observer.start()
+
+
+    """
+    Main/Core of the program
+
+    """
+    def startShell(self):
+        print("PySH v1. PROTOTYPE/UNDER DEVELOPMENT\nPlease type 'help' to show essential commands\nHave Fun XD\n\n")
+        while True:
+            x = input("[PySH: "+str(len(self._session))+" session(s) active]")
+            cmd = ""
+            args = []
+            if " " in x:
+                cmd = x.split(' ')[0]
+                args = x.split(' ')
+                args.pop(0)
+            else: cmd = x
+            print("-- Processing command: ", cmd, " with args: ", args)
+            res = self.__cmd.exc(cmd, args)
+            if not res[0]:
+                print("[ERROR] ", res[1])
+            
+
+    
+    def __exit(self, signum, frame):
+        print("Exiting ..")
+        os.remove(self.__SESSION_PATH+"/"+str(self.PID)+".txt")
+        shutil.rmtree(self.__SOCKET+"/"+str(self.PID), ignore_errors=True)
+        exit(2)
+
+
+PySH()

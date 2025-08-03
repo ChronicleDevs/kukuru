@@ -1,0 +1,30 @@
+{
+	"uuid": "e7e286ff-e2f8-41c6-a6a3-2147b7dfc5fb",
+	"name": "Y Program",
+	"version": "v1.0",
+	"cmd": {
+		"y": {
+			"bin": "(app_root)/bin/bin.py"
+		},
+		"x": {
+			"bin": "(app_root)/bin/XXbin.py"
+		},
+		"cd": {
+			"bin": "(app_root)/bin/cd.py"
+		},
+		"ls": {
+			"bin": "(app_root)/bin/ls.py"
+		},
+		"pwd": {
+			"bin": "(app_root)/bin/pwd.py"
+		}
+	},
+	"deps": {
+		"pip": {
+			"colorama": "stable"
+		},
+		"inline": {
+			"sysv": "stable"
+		}
+	}
+}

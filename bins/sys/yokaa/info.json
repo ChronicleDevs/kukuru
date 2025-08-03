@@ -1,0 +1,16 @@
+{
+	"uuid": "54573da2-11bc-41c4-8a4f-99d50e54eee4",
+	"name": "Yooka Package Manager",
+	"version": "v1.0",
+	"cmd": {
+		"yo": {
+			"bin": "(app_root)/bin/yo.py"
+		}
+	},
+	"deps": {
+
+		"inline": {
+			"sysv": "stable"
+		}
+	}
+}

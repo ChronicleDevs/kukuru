@@ -1,0 +1,45 @@
+import socket
+import os
+import json
+import random
+
+SOCKET_DIR = os.path.join(os.path.dirname(__file__), "..", "sockets/")
+SOCKET_COUNT = 16
+
+def get_available_sockets(PID):
+    available = []
+    for i in range(SOCKET_COUNT):
+        path = os.path.join(SOCKET_DIR + PID, f"sock{i}.sock")
+        try:
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.connect(path)
+            client.close()  # tutup langsung, kita hanya tes ketersediaan
+            available.append(i)
+        except socket.error:
+            continue
+    return available  # list kosong = semua sibuk/gagal
+
+def call_root_service(action, target, PID, app_name="UnknownApp"):
+    sock = get_available_sockets(PID)
+    print("{{--}} ", sock)
+    if not sock:
+        return {"status": "ERROR", "message": "All sockets are busy"}
+    sock_index = random.choice(sock)
+    print("---- ", SOCKET_DIR+str(PID))
+    path = os.path.join(SOCKET_DIR+str(PID), f"sock{sock_index}.sock")
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client.connect(path)
+        req = {
+            "action": action,
+            "target": target,
+            "app": app_name
+        }
+        client.send(json.dumps(req).encode())
+        response = client.recv(4096)
+        return json.loads(response.decode())
+    except Exception as e:
+        return {"status": "ERROR", "message": str(e)}
+    finally:
+        client.close()
+

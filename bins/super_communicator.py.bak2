@@ -1,0 +1,54 @@
+import socket
+import os
+import json
+import random
+
+REGISTRY_FILE = os.path.join(os.path.dirname(__file__), "..", "nsc/registry.json")
+SOCKET_DIR = os.path.join(os.path.dirname(__file__), "..", "nsc/")
+SOCKET_COUNT = 16
+
+def get_active_socket(PID):
+    if not os.path.exists(REGISTRY_FILE):
+        return None, "Registry not found"
+
+    with open(REGISTRY_FILE) as f:
+        try:
+            registry = json.load(f)
+        except json.JSONDecodeError:
+            return None, "Registry corrupted"
+
+    print("-- ",registry)
+
+    for entry in registry[PID]:
+        if entry["status"] == "active":
+            sock_path = os.path.join(SOCKET_DIR, entry["path"])
+            try:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect(sock_path)
+                return sock, None
+            except socket.error:
+                continue
+    return None, "All sockets failed or busy"
+
+
+def call_root_service(action, target, PID, app_name="UnknownApp"):
+    sock, err = get_active_socket(PID)
+    if not sock:
+        return {"status": "ERROR", "message": "All sockets are busy"}
+
+
+    try:
+        
+        req = {
+            "action": action,
+            "target": target,
+            "app": app_name
+        }
+        sock.send(json.dumps(req).encode())
+        response = sock.recv(4096)
+        return json.loads(response.decode())
+    except Exception as e:
+        return {"status": "ERROR", "message": str(e)}
+    finally:
+        sock.close()
+
