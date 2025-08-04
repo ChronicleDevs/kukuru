@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import copy
 import json
 
 from lib.CommandHandler import PackageManagerHandler, handler
@@ -49,11 +50,13 @@ class FSRead:
 class PySHAPI:
     def __init__(self,root):
         self.__root = root
-        print("-> ", handler.getAll())
+        #print("-> ", handler.getAll())
 
     def Check(self,__request):
         # Parse user args
-        args = __request["argv"]
+        _ = copy.deepcopy(__request)
+        args = _['argv']
+        #print(args)
         args.pop(0)
         options = []
         for i in args:
@@ -62,6 +65,8 @@ class PySHAPI:
                 del args[args.index(i)]
 
         FSAPI = ['ChangeDirectory', 'ListDirectory', 'Remove', 'Create']
+        PMAPI = ['PackageManagerUtilities', 'PackageManagerUpdate']
+        PROP = ['GetSystemInfo']
                 
         def resolve_user_path(user_input: str, root: Path) -> Path:
             user_path = Path(user_input)
@@ -117,10 +122,28 @@ class PySHAPI:
 
 
                 return FSRead.ls_v(__target, __wl)
-            elif __request['action'] == 'PackageManagerUtilities':
+        elif __request['action'] in PMAPI:
+              if __request['action'] == 'PackageManagerUtilities':
+
                 try:
-                    print("ok")
+                    reqv = json.loads(__request['argv'][0])
+                    if reqv['request'] == 'get-all-pkginfo':
+                        return {"status":"OK", "message": str(handler.getAll())}
+                    elif reqv['request'] == 'reset-venv':
+                        pk = reqv['package']
+                        x, msg = handler.reset_venv(pk.split(':')[1], pk.split(':')[0])
+                        status = "OK"
+                        if not x: status = "ERROR"
+                        return {"status": status, "message": msg}
                 except json.JSONDecodeError as v:
                     return {"status": "ERROR", "message": "Error processing request."}
-                print(args)
+        elif __request['action'] in PROP:
+            if __request['action'] == 'GetSystemInfo':
+                syinfo = {
+                    "root": str(__root),
+                }
+                return {"status": "OK", "message": json.dumps(syinfo)}
+
+        else:
+            return {"status": "ERROR", "message": f"API with code: {__target['action']} is not found."}
             

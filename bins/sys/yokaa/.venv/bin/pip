@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/home/kukuru/bins/sys/yokaa/.venv/bin/python3
+#!/home/ceth/pydrv/bins/sys/yokaa/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

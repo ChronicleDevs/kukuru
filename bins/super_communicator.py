@@ -9,6 +9,9 @@ def call_root_service(pid, action, argv, app_name="UnknownApp"):
     reg_key = f"registry:{pid}"
     if not r.exists(reg_key):
         return {"status": "ERROR", "message": f"No registry for PID {pid}"}
+    
+    if not isinstance(argv, list) :
+        argv = [argv]
 
     entries = r.hgetall(reg_key)
     choices = []

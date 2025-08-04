@@ -4,23 +4,9 @@ import random
 import json
 from pathlib import Path
 import sys
-
-class PackageManagerHandler:
-    def __init__(self):
-        self._package_map = {"sys": {}, "usr": {}}
-
-    def register(self, x, y):
-        for i in y.keys():
-            self._package_map[x][i] = y[i]
-
-    def getch(self):
-        print(json.dumps(self._package_map, indent=2))
-
-    def getAll(self):
-        return self._package_map
+import shutil
 
 
-handler = PackageManagerHandler()
 
 class CommandHandler:
     """
@@ -74,8 +60,8 @@ class CommandHandler:
         print(self.__SysMETA)
 
 
-
-    def __Setupvenv(self, target_dir):
+    @staticmethod
+    def Setupvenv(target_dir):
         target = Path(target_dir).resolve()
         venv_dir = target / ".venv"
     
@@ -105,9 +91,10 @@ class CommandHandler:
         try: 
             subprocess.run([str(python_path), str(bin_path)] + a, check=True)
             return (True, '')
+        except FileNotFoundError:
+            return (False, "Error when trying to run the app, the executetable venv is missing, please run 'yo resetvenv [pkg]' to reinstall venv")
         except (subprocess.CalledProcessError, subprocess.SubprocessError) as e:
-            print("[!] Error occured when running the application. Stopping app..")
-            return (False, "")
+            return (False, "Error occured when running the application. Stopping app..")
     def __Scan(self):
         x_sys = os.listdir(self.__SYSP)
         x_usr = os.listdir(self.__USRP)
@@ -136,7 +123,7 @@ class CommandHandler:
             path = val["path"]
 
             if not os.path.exists(os.path.join(path, ".venv")):
-                self.__Setupvenv(Path(path))
+                CommandHandler.Setupvenv(Path(path))
 
             val["path_venv"] = os.path.join(path, ".venv")
 
@@ -198,3 +185,41 @@ class CommandHandler:
             return s_binvalid, s_metavalid
 
 
+class PackageManagerHandler:
+    def __init__(self):
+        self._package_map = {"sys": {}, "usr": {}}
+
+    def register(self, x, y):
+        for i in y.keys():
+            self._package_map[x][i] = y[i]
+    
+    def reset_venv (self, pkgname, where):
+        try:
+            pkg = self._package_map[where][pkgname]
+            venv = pkg["path_venv"]
+            path = pkg["path"]
+            shutil.rmtree(venv)
+            CommandHandler.Setupvenv(path)
+
+            return True, "Successfully reset venv"
+        except FileNotFoundError:
+            CommandHandler.Setupvenv(path)
+
+            return True, "Successfully reset venv"
+        except (shutil.Error, shutil.ExecError):
+            return False, "Couldn't delete program's venv."
+        except KeyError:
+            return False, "Package not found"
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+
+    def getch(self):
+        print(json.dumps(self._package_map, indent=2))
+
+    def getAll(self):
+        return self._package_map
+
+
+handler = PackageManagerHandler()

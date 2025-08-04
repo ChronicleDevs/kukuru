@@ -101,7 +101,7 @@ class PySH:
         try:
             data = conn.recv(4096)
             request = json.loads(data.decode())
-            print(f"[shell:{self.PID}] Request from {request['app']} -> {request['action']} {request['argv']}")
+            #print(f"[shell:{self.PID}] Request from {request['app']} -> {request['action']} {request['argv']}")
 
             # Basic authorization check
             ps = PySHAPI(self.__ROOT)
