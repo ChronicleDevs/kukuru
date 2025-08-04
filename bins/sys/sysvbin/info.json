@@ -1,6 +1,8 @@
 {
-	"uuid": "e7e286ff-e2f8-41c6-a6a3-2147b7dfc5fb",
-	"name": "Y Program",
+	"codename": "sysvbin",
+	"name": "SYSVBIN System Binaries v1.0",
+  "author": "Yokaa",
+  "description": "The most essentials things you need.",
 	"version": "v1.0",
 	"cmd": {
 		"y": {
@@ -20,9 +22,6 @@
 		}
 	},
 	"deps": {
-		"pip": {
-			"colorama": "stable"
-		},
 		"inline": {
 			"sysv": "stable"
 		}

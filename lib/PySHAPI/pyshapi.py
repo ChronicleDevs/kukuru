@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import json
 
+from lib.CommandHandler import PackageManagerHandler, handler
 class FSRead:
     @staticmethod
     def cd_v(target, wl):
@@ -48,6 +49,7 @@ class FSRead:
 class PySHAPI:
     def __init__(self,root):
         self.__root = root
+        print("-> ", handler.getAll())
 
     def Check(self,__request):
         # Parse user args
@@ -96,7 +98,7 @@ class PySHAPI:
 
         __root = self.__root
 
-
+        
 
         if __request['action'] in FSAPI:
 
@@ -116,5 +118,9 @@ class PySHAPI:
 
                 return FSRead.ls_v(__target, __wl)
             elif __request['action'] == 'PackageManagerUtilities':
+                try:
+                    print("ok")
+                except json.JSONDecodeError as v:
+                    return {"status": "ERROR", "message": "Error processing request."}
                 print(args)
             

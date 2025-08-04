@@ -5,6 +5,23 @@ import json
 from pathlib import Path
 import sys
 
+class PackageManagerHandler:
+    def __init__(self):
+        self._package_map = {"sys": {}, "usr": {}}
+
+    def register(self, x, y):
+        for i in y.keys():
+            self._package_map[x][i] = y[i]
+
+    def getch(self):
+        print(json.dumps(self._package_map, indent=2))
+
+    def getAll(self):
+        return self._package_map
+
+
+handler = PackageManagerHandler()
+
 class CommandHandler:
     """
     Command Handler by RYU
@@ -33,21 +50,28 @@ class CommandHandler:
         print("[!] Loading essentials CMD..")
         self.__Scan()
         print("[V] Successfully loaded.")
+        handler.register("sys", self.__SysMETA)
+        handler.getch()
+        #print("[S] Printing state: ", self.__SysBIN)
+        #print("[M] Printing meta: ", self.__SysMETA)
 
     def exc(self, tx, args):
         if not tx in self.__SysBIN.keys():
             return (False, 'Command not found')
         else:
             try:
+                cmd_uidx = self.__SysBIN[tx]
+                cmd = self.__SysMETA[cmd_uidx]["cmd"][tx]["bin"].replace("(app_root)", self.__SysMETA[cmd_uidx]['path'])
 
-                cmd = self.__SysBIN[tx]["cmd"][tx]["bin"].replace("(app_root)", self.__SysBIN[tx]['path'])
-                return self.__run_bin_py(self.__SysBIN[tx]['path_venv'],  cmd, args)
+                return self.__run_bin_py(self.__SysMETA[cmd_uidx]['path_venv'],  cmd, args)
                 
 
             except KeyError:
                 return (False, 'Command Not Found or Invalid Configuration.')
 
-
+    def __saveState(self):
+        print(self.__SysBIN)
+        print(self.__SysMETA)
 
 
 
@@ -87,20 +111,41 @@ class CommandHandler:
     def __Scan(self):
         x_sys = os.listdir(self.__SYSP)
         x_usr = os.listdir(self.__USRP)
-        _x = self.__TreeCheck(x_sys, v=True)
+        bin, meta = self.__TreeCheck(x_sys, v=True)
 
         self.__SysBIN = {}
+        self.__SysMETA = {}
     
-        for key, val in _x.items():
-            path = val["path"]
-            if not os.path.exists(path + "/.venv"):
-                self.__Setupvenv(Path(path))
-            val = val.copy()  # supaya gak ubah yang lama
-            val["path_venv"] = os.path.join(path, ".venv")
-            _cmds = val["cmd"]
-            for i in _cmds.keys():
-                self.__SysBIN[i] = val
+        #for key, val in meta.items():
+         #   path = val["path"]
+         #   if not os.path.exists(path + "/.venv"):
+         #       self.__Setupvenv(Path(path))
+         #   val = val.copy()  # supaya gak ubah yang lama
+         #   val["path_venv"] = os.path.join(path, ".venv")
+         #   _cmds = val["cmd"]
+         #   for i in _cmds.keys():
+         #       self.__SysBIN[i] = val
             #self.__SysBIN[key] = val
+
+
+        for alias, codename in bin.items():
+            if codename not in meta:
+                continue  # atau raise Exception kalau alias invalid
+
+            val = meta[codename].copy()
+            path = val["path"]
+
+            if not os.path.exists(os.path.join(path, ".venv")):
+                self.__Setupvenv(Path(path))
+
+            val["path_venv"] = os.path.join(path, ".venv")
+
+            # Masukkan semua command di package ini ke __SysBIN
+            for cmd in val["cmd"]:
+                self.__SysBIN[cmd] = codename
+
+            # Simpan metadata asli by codename
+            self.__SysMETA[codename] = val
 
         
 
@@ -115,7 +160,8 @@ class CommandHandler:
             return sd.replace('[[['+sign+']]]', rep)
 
         if not s:
-            svalid = {}
+            s_binvalid = {}
+            s_metavalid = {}
             signature = self.Util.random_str_gen(64)
             sys_bd = self.__SYSP + "/[[["+signature+"]]]"
             sysbp = sys_bd+'/bin'
@@ -131,10 +177,15 @@ class CommandHandler:
                             with open(convert(sysnfo, signature, x)) as nfo:
                                 yd = json.load(nfo)
                                 if v: print("!-- ", yd, "\n\n")
-                                if self.Util.is_valid_uuid(yd["uuid"]):
+                                if 1 == 1:
                                     yd["path"] = self.__SYSP+"/"+x
+
+                                    uidx = yd["codename"]
+                                    del yd["codename"]
+
+                                    s_metavalid[uidx] = yd
                                     for i in yd["cmd"].keys():
-                                        svalid[i] = yd
+                                        s_binvalid[i] = uidx
                                 else:
                                     print("Invalid UUID")
                                     continue
@@ -144,6 +195,6 @@ class CommandHandler:
                         except json.JSONDecodeError:
                             print("Invalid Config File")
                             continue
-            return svalid
+            return s_binvalid, s_metavalid
 
 

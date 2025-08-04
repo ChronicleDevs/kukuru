@@ -23,6 +23,7 @@ from lib.PySHAPI.pyshapi import PySHAPI
 from lib.CommandHandler import CommandHandler
 from lib.Util import Util
 
+sys.path.insert(0, os.path.abspath("lib"))
 
 
 class PySH:
@@ -176,6 +177,7 @@ class PySH:
         print("PySH v1. PROTOTYPE/UNDER DEVELOPMENT\nPlease type 'help' to show essential commands\nHave Fun XD\n\n")
         while True:
             x = input("[PySH: "+str(len(self._session))+" session(s) active]")
+            x = x.strip()
             cmd = ""
             args = []
             if " " in x:
